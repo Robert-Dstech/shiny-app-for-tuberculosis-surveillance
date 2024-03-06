@@ -1,5 +1,5 @@
 # Tuberculosis surveillance dashboard
-This repository contains a tuberculosis dashboard with visualizations aimed at providing insights into various aspects related to tuberculosis . The dashboard encompasses data on samples collected, positivity rates, demographics, antimicrobial resistance, and HIV status.
+This repository contains a tuberculosis dashboard with visualizations aimed at providing insights into various aspects related to tuberculosis . The dashboard encompasses tabs on samples collected, positivity rates, demographics, antimicrobial resistance, and HIV status.
 
 ## Features
 
