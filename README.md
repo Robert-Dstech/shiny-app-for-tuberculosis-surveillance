@@ -7,7 +7,7 @@ Samples Collected: Visualizations depicting the number of TB samples collected o
 
 Positivity Rates: maps illustrating the positivity rates of TB samples, enabling the monitoring of disease prevalence .
 
-Demographics: Insights into the demographic distribution of TB cases, including age, gender.
+Demographics: Insights into the demographic distribution of TB cases, including age and gender.
 
 Antimicrobial Resistance: Visual representations of firstline tuberculosis antimicrobial resistance patterns among TB samples, aiding in understanding treatment efficacy and drug resistance trends.
 
