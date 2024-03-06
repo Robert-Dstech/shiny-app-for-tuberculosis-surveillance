@@ -1,0 +1,391 @@
+---
+title: "TB dashboard"
+output: 
+  flexdashboard::flex_dashboard:
+    orientation: columns
+    vertical_layout: fill
+    runtime: shiny
+---
+
+
+
+About
+=====================================
+Row
+----------------
+-   The application  utilizes TB data collected from national public health laboratory. Its main purpose is to display key insights into the TB scenario .It's important to note that this analysis does not establish causality but it is useful in highlighting areas that may require further investigation.
+
+-   Data quality may vary due to accuracy and completeness .
+
+```{r setup, include=FALSE}
+library(flexdashboard)
+library(shiny)
+library(tidyverse)
+library(readxl)
+library(janitor)
+library(sf)
+library(plotly)
+
+
+
+#hpv<-read_excel("HPV_data.xlsx")%>%clean_names() 
+#Hpv2<-hpv%>%
+  #select(hpv_16, hpv_18,other_hpv)%>%
+  #pivot_longer(cols=c(hpv_16, hpv_18,other_hpv),names_to = "disease",values_to = "result")%>%
+ # group_by(disease,result)%>%
+ # count()%>%
+  #ungroup()%>%
+  #group_by(disease)%>%
+ # mutate(proportion=n/sum(n)*100)%>%mutate(
+  #  disease = recode(
+  #    disease,
+   #   "hpv_16" = "HPV 16",
+    #  "hpv_18"="HPV 18",
+   #   "other_hpv"="OTHER HPV"
+      
+ #      )
+#  ) %>%
+#  ungroup()
+
+ TB_data <- read_csv("tb2023e.csv")
+ TB_data2<-TB_data%>%select(sample_number,MOH_COLLECTION_DATE)%>%rename(Month=MOH_COLLECTION_DATE) #%>%group_by(Month)%>%
+  #dplyr::summarise(freq=n())%>%ungroup
+TB_data2$Month <- as.Date( TB_data2$Month, format = "%m/%d/%Y")
+TB_data2$Month<- strftime(TB_data2$Month, "%Y")
+Tb_data5<-TB_data2%>%group_by(Month)%>%
+  dplyr::summarise(freq=n())%>%filter(!is.na(Month))%>%filter(Month %in% c( 2020, 2021, 2022, 2023))
+
+positive<-TB_data %>%filter(MGIT == "Positive")%>%select(MOH_COLLECTION_DATE,MGIT)%>%rename(Month=MOH_COLLECTION_DATE)
+positive$Month <- as.Date( positive$Month, format = "%m/%d/%Y")
+positive$Month<- strftime(positive$Month, "%Y")
+positive2<-positive%>%group_by(Month)%>%
+  dplyr::summarise(freq=n())%>%filter(!is.na(Month))%>%filter(Month %in% c( 2020, 2021, 2022, 2023))%>% 
+  mutate(total=sum(freq))  %>%
+  mutate(proportion=round(freq/total*100))%>%ungroup()
+
+
+TB_data3<-TB_data%>%select(MOH_COLLECTION_DATE,sample_number,Province)%>%rename(Year=MOH_COLLECTION_DATE)
+TB_data3$Year <- as.Date( TB_data3$Year, format = "%m/%d/%Y")
+TB_data3$Year<- strftime(TB_data3$Year, "%Y")
+map_data<-TB_data3%>%mutate(
+    Province= recode(
+      Province,
+      "BUNGOMA " = "Bungoma",
+      "KIAMBU " = "Kiambu",
+      "KILIFI" = "Kilifi",
+      "MACHAKOS" = "Machakos",
+      "MURANGA" = "Muranga",
+      "NAIROBI" = "Nairobi",
+      "NYERI" = "Nyeri",
+      "TRANS NZOIA"="Trans Nzoia"
+    )
+  ) %>%
+  mutate(Province=str_to_title(Province))%>%
+  filter(!is.na(Province))%>%
+  group_by(Year,Province)%>%
+  dplyr::summarise(freq=n())%>%filter(Year %in% c( 2020, 2021, 2022, 2023))%>%ungroup()
+
+
+
+
+
+
+TB_data6<-TB_data%>%filter(MGIT == "Positive")%>%select( MOH_COLLECTION_DATE,Province,MGIT)%>%rename(Year=MOH_COLLECTION_DATE)
+TB_data6$Year <- as.Date( TB_data6$Year, format = "%m/%d/%Y")
+TB_data6$Year<- strftime(TB_data6$Year, "%Y")
+positives<-TB_data6%>%  
+mutate(
+    Province= recode(
+      Province,
+      "BUNGOMA " = "Bungoma",
+      "KIAMBU " = "Kiambu",
+      "KILIFI" = "Kilifi",
+      "MACHAKOS" = "Machakos",
+      "MURANGA" = "Muranga",
+      "NAIROBI" = "Nairobi",
+      "NYERI" = "Nyeri",
+      "TRANS NZOIA"="Trans Nzoia"
+    )
+  ) %>%
+  mutate(Province=str_to_title(Province))%>%
+  filter(!is.na(Province))%>%
+  group_by(Year,Province)%>%
+  dplyr::summarise(freq=n())%>%filter(Year %in% c( 2020, 2021, 2022, 2023))%>% 
+  mutate(total=sum(freq))  %>%
+  mutate(proportion=round(freq/total*100))%>%ungroup()
+
+
+#discrepancies <- setdiff(county_data$Province, map_data$Province)
+
+
+library(sf)
+library(ggiraph)
+county_data <- read_sf("County.shp")%>%rename(Province=Name)
+
+data1 <- full_join(county_data,map_data, by="Province")
+data2 <- full_join(county_data,positives, by="Province")
+
+ sample_no<-ggplot(data1)+
+  geom_sf_interactive(aes(geometry = geometry, fill = freq, color = freq, tooltip =paste(Province, ": ", freq), data_id = Province))+
+
+  #geom_sf_interactive(aes(geometry=geometry, fill=freq,color=freq, tooltip=Province, data_id=Province))+
+#  geom_sf(data=county_data, aes(geometry=geometry),fill=NA, size=0.0)+
+  facet_wrap(~Year)+
+  theme_void()+
+  scale_fill_gradient(low = "#99d8c9", high = "red")+
+    scale_color_gradient(low = "#99d8c9", high = "red")+
+  labs(x="", y="",fill="")+
+  theme(text=element_text(size=12),legend.position = "bottom") 
+ # map_postives<-ggplot(data2, aes(geometry=geometry, fill=freq))+
+ #  geom_sf(aes(color=freq))+
+ # # geom_sf(data=county_data, aes(geometry=geometry),fill=NA,  size=0.0)+
+ #  facet_wrap(~Year)+
+ #  theme_void()+
+ #  scale_fill_gradient(low = "white", high = "red")+
+ #    scale_color_gradient(low = "white", high = "red")+
+ #  labs(x="", y="",fill="")+
+ #  theme(text=element_text(size=12), legend.position = "bottom") 
+ 
+map_postives<-ggplot(data2)+
+  geom_sf_interactive(aes(geometry = geometry, fill = proportion, color = proportion, tooltip =paste(Province, ": ", proportion," % "), data_id = Province))+
+
+  #geom_sf_interactive(aes(geometry=geometry, fill=freq,color=freq, tooltip=Province, data_id=Province))+
+#  geom_sf(data=county_data, aes(geometry=geometry),fill=NA, size=0.0)+
+  facet_wrap(~Year)+
+  theme_void()+
+  scale_fill_gradient(low = "#99d8c9", high = "red")+
+    scale_color_gradient(low = "#99d8c9", high = "red")+
+  labs(x="", y="",fill="")+
+  theme(text=element_text(size=12),legend.position = "bottom") 
+
+HIV_positives <- TB_data %>%
+  filter( MGIT== "Positive")%>%select( MGIT,MOH_HIV_STATUS)%>%group_by(MGIT,MOH_HIV_STATUS)%>%
+  dplyr::summarise(freq=n()) %>%
+  ungroup()%>%
+ filter(MOH_HIV_STATUS %in% c("POSITIVE", "NEGATIVE"))%>%rename( "Total HIV positive and negative"=MOH_HIV_STATUS,"Positive for both TB and HIV"=MGIT)
+
+HIV_positives<-HIV_positives%>%
+  mutate(percent=round(freq/sum(HIV_positives$freq)*100,1))
+
+
+p<-ggplot(HIV_positives, aes(x =`Total HIV positive and negative`,y=percent, fill =`Total HIV positive and negative`)) +
+  geom_bar(stat = "identity") +
+  labs(title = "",
+       x = "HIV STATUS",
+       y = "PROPORTION") +
+  theme_minimal() +
+  scale_fill_manual(values=c( "#636363","#636363"))+
+   scale_y_continuous(limits = c(0, 100)) 
+
+
+Age <- TB_data %>%
+  filter( MGIT== "Positive")%>%select( MGIT,AGE,X_GENDER)%>%group_by(AGE,X_GENDER)%>%filter(X_GENDER=="M"|X_GENDER=="F")%>%rename(Gender=X_GENDER)%>%
+dplyr::summarise(freq=n())%>% 
+  mutate(age_cat = ifelse(AGE < 30, "<30yrs", ifelse(AGE > 29 & AGE< 61, "30-60yrs", ifelse(AGE > 60 & AGE < 91, "61-90yrs", ifelse(AGE > 90, ">90yrs", NA)))))%>% filter(!is.na(age_cat))%>%select(-AGE,freq)%>% 
+  mutate(
+    Gender= recode(
+      Gender,
+    "M"="Male",
+    "F"="Female"
+    )
+  )%>%
+  ungroup()
+
+PROP<-Age%>%
+  mutate(percent=round(freq/sum(Age$freq)*100,1))
+
+
+A<-ggplot(PROP, aes(x = age_cat, y = percent,fill=Gender)) +
+  geom_bar(stat = "identity" ) +  
+  labs(x = "", y = "Proportion") +
+  theme_minimal()+  
+  theme(axis.text.x = element_text(hjust = 1, vjust = 0.5), 
+        axis.title = element_text(size = 12, face = "bold"),  
+        axis.text = element_text(size = 10))+ 
+  scale_fill_manual(values = c("#377eb8", "#4daf4a"))+
+   scale_y_continuous(limits = c(0, 100))  
+
+sus_1<-TB_data%>%filter( MGIT== "Positive")%>%select(MGIT,DST_1ST_Isoniazid,DST_1ST_Rifampicin,DST_1ST_Ethambutol,DST_1ST_Pyrazinamide)%>%pivot_longer(cols=c(DST_1ST_Isoniazid,DST_1ST_Rifampicin,DST_1ST_Ethambutol,DST_1ST_Pyrazinamide),names_to = "Antimicrobial",values_to = "Result")%>%group_by(Result)%>%
+  filter(Result=="Resistant"|Result=="Sensitive"|Result=="Indeterminate")%>%
+  mutate(
+    Result = recode(
+      Result,
+      "Indeterminate"="Intermediate"
+    ))%>%
+  dplyr::summarise(freq=n())%>%ungroup
+
+ant <- sus_1 %>%select(Result,freq)%>%
+  mutate(percent = round(freq / sum(freq) * 100, 1))
+
+
+
+
+sus_2<-TB_data%>%filter( MGIT== "Positive")%>%select(DST_1ST_Isoniazid,DST_1ST_Rifampicin,DST_1ST_Ethambutol,DST_1ST_Pyrazinamide)%>%pivot_longer(cols=c(DST_1ST_Isoniazid,DST_1ST_Rifampicin,DST_1ST_Ethambutol,DST_1ST_Pyrazinamide),names_to = "Antimicrobial",values_to = "Result")%>%group_by(Antimicrobial,Result)%>%filter(Result=="Resistant"|Result=="Sensitive"|Result=="Indeterminate")%>%
+  mutate(
+    Result = recode(
+      Result,
+      "Indeterminate"="Intermediate"
+    ))%>%
+  mutate(
+    Antimicrobial = recode(
+      Antimicrobial,
+      "DST_1ST_Isoniazid"="Isoniazid",
+      "DST_1ST_Rifampicin"="Rifampicin",
+      "DST_1ST_Ethambutol"="Ethambutol",
+      "DST_1ST_Pyrazinamide"="Pyrazinamide"
+    ))%>%
+  dplyr::summarise(freq=n()) %>%
+  ungroup()
+
+ant2<-sus_2%>%select(Antimicrobial,Result,freq)%>%
+  mutate(proportion=round(freq/sum(sus_2$freq)*100,1))
+
+g <-ggplot(ant, aes(x = Result, y = percent)) +
+  geom_bar(stat = "identity") +
+  labs(title = "",
+       x = "Antimicrobial Resistance Result",
+       y = "proportion") +
+   scale_y_continuous(limits = c(0, 100))+ 
+  #scale_fill_manual(values = c("Resistant" = "red", "Sensitive" = "green", "Intermediate" = "blue")) +
+  theme_minimal()
+v<-ggplot(ant2, aes(x = Antimicrobial, y = proportion,fill=Result)) +
+  geom_col() +
+  labs(title = "",
+       x = "Antibiotic",
+       y = "proportion") +
+  scale_fill_manual(values = c("Resistant" = "red", "Sensitive" = "#a6bddb", "Intermediate" = "#31a354")) +
+   scale_y_continuous(limits = c(0, 50))+
+  theme_minimal()
+```
+samples collection
+=====================================
+
+
+Row
+--------
+
+### Number of samples collected and positivity proportion
+
+```{r,fig.width=10.4, fig.height=6}
+Tb_data5a <- full_join(Tb_data5, positive2[, c(1,4)], by="Month")
+ggplot(Tb_data5a, aes(x =Month))+
+  geom_col(aes( y=freq), fill="grey60")+
+  geom_point(aes(y=proportion*504))+
+  geom_line(aes(y=proportion*504), group=1, color="cyan4")+
+  theme_bw()+scale_y_continuous(sec.axis = sec_axis(~./ 504))+
+  labs(x="Year", y=" frequency")
+```
+
+
+
+
+positivity
+===================================== 
+Row
+----------------
+
+
+### Number of samples collected
+
+```{r,fig.width=10.4, fig.height=6}
+
+girafe(ggobj = sample_no,
+                   options = list(
+                     opts_hover(css = "fill:#666666;cursor:pointer;"),
+                     opts_selection(css = "fill:orange;", type = "multiple"),
+                     opts_zoom(max = 4)), width=8, height=7)
+
+ #x <- girafe( ggobj = sample_no)
+#  if( interactive() ) print(x)
+
+#renderGirafe({
+ # x <- girafe(ggobj = sample_no, width_svg = 15, height_svg = 8,
+  #                 options = list(
+   #                  opts_hover(css = "fill:#666666;cursor:pointer;"),
+    #                 opts_selection(css = "fill:orange;", type = "multiple"),
+     #                opts_zoom(max = 4)))
+#    print(x)
+#})
+
+```
+
+
+Row
+----------------
+
+
+### positivity
+
+```{r,fig.width=10.4, fig.height=6}
+girafe(ggobj = map_postives,
+                   options = list(
+                     opts_hover(css = "fill:#666666;cursor:pointer;"),
+                     opts_selection(css = "fill:orange;", type = "multiple"),
+                     opts_zoom(max = 4)), width=8, height=7)
+```
+Demographics
+=====================================
+
+Row
+----------------
+
+### TB positive samples demographcs
+
+
+
+```{r,fig.width=8, fig.height=8}
+A
+```
+
+Antimicrobial susceptibility
+=====================================
+
+
+
+
+```{r}
+#valueBox(value = paste0(round(sus_1[sus_1$Result%in%"Sensitive",]$freq/sum(sus_1$freq)*100,1), "%"), caption = "of the total AST's  done were susceptible to 1st line antimicrobials", icon="", color="#e6550d")
+```
+
+
+Row
+----------------
+
+### Antimicrobial susceptibility results for first line antibiotics
+
+
+
+
+```{r}
+g
+```
+
+Row
+----------------
+
+### Susceptibility for specific first line antibiotics
+
+
+```{r}
+ggplotly(v)
+```
+
+HIV status
+=====================================
+Row
+----------------
+
+### Hiv status
+
+```{r}
+p
+
+```
+
+
+
+
+ 
+
+
+
