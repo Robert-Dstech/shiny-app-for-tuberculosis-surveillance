@@ -1,6 +1,7 @@
+# TB dashboard
 This repository contains a tuberculosis dashboard with visualizations aimed at providing insights into various aspects related to tuberculosis (TB) data. The dashboard encompasses data on samples collected, positivity rates, demographics, antimicrobial resistance, and HIV status.
 
-# Features
+## Features
 
 Samples Collected: Visualizations depicting the number of TB samples collected over time, helping to track trends in sample collection.
 
